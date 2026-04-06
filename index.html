@@ -214,7 +214,7 @@
 
     // ── Main App ─────────────────────────────────────────────────────────────
     function App() {
-      const [apiKey, setApiKey] = useState(()=>{ const p1="sk-ant-api03-Vh8Lnr5Q5L_KAXl1yinlRgsv_9SJ40RFXV8ML3gvjGLbx0cy1MfCC8g0919J6otYN88A3WeqwHXbPxrW"; const p2="_AHZVg-QTF2FQAA"; return p1+p2; });
+      const [apiKey, setApiKey] = useState("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");
       const [meals, setMeals]         = useState(()=>lsGet("ms_meals",[]));
       const [analyzing, setAnalyzing] = useState(false);
       const [captureMode, setCapture] = useState(false);
@@ -273,7 +273,7 @@
           const mime=captured.startsWith("data:image/png")?"image/png":"image/jpeg";
           const res = await fetch("https://api.anthropic.com/v1/messages",{
             method:"POST",
-            headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+            headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
             body:JSON.stringify({
               model:"claude-sonnet-4-6",
               max_tokens:800,
@@ -308,7 +308,7 @@ All macro values are numbers in grams (calories in kcal). Be realistic. Sum all 
 
       const logout = ()=>{ if(confirm("Remove API key from this device?")){ lsSet("ms_key",""); setApiKey(""); } };
 
-      // no login screen
+       
 
       // Group history by day
       const historyDays = (() => {
