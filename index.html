@@ -4,29 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>MacroScan</title>
-
-  <!-- PWA / iOS -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="MacroScan" />
   <meta name="theme-color" content="#06060f" />
-  <meta name="mobile-web-app-capable" content="yes" />
-
-  <!-- Icons (SVG data URI — no extra files needed) -->
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%2306060f'/%3E%3Ctext x='90' y='115' font-size='90' text-anchor='middle' font-family='system-ui'%3E🔥%3C/text%3E%3C/svg%3E" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306060f'/%3E%3Ctext x='16' y='24' font-size='20' text-anchor='middle' font-family='system-ui'%3E🔥%3C/text%3E%3C/svg%3E" />
-
-  <!-- Manifest inline via blob — registered by JS below -->
-
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" />
-
-  <!-- React + Babel -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; background: #06060f; }
@@ -35,83 +23,63 @@
     @keyframes slideIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
     @keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
     @keyframes pulse   { 0%,100%{opacity:1;} 50%{opacity:.4;} }
-    @keyframes sweep   { 0%{left:-40%;} 100%{left:100%;} }
     @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(20px) scale(.95);} to{opacity:1;transform:translateX(-50%) translateY(0) scale(1);} }
   </style>
 </head>
 <body>
   <div id="root"></div>
-
-  <script>
-    // ── Inline Web Manifest ──────────────────────────────────────────────────
-    const manifest = {
-      name: "MacroScan",
-      short_name: "MacroScan",
-      description: "Track daily nutrition macros with a photo",
-      start_url: "./",
-      display: "standalone",
-      background_color: "#06060f",
-      theme_color: "#06060f",
-      orientation: "portrait",
-      icons: [
-        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='44' fill='%2306060f'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle' font-family='system-ui'%3E🔥%3C/text%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" },
-        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%2306060f'/%3E%3Ctext x='256' y='340' font-size='290' text-anchor='middle' font-family='system-ui'%3E🔥%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml" }
-      ]
-    };
-    const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
-    const manifestUrl = URL.createObjectURL(blob);
-    const linkEl = document.createElement("link");
-    linkEl.rel = "manifest"; linkEl.href = manifestUrl;
-    document.head.appendChild(linkEl);
-
-    // ── Service Worker ───────────────────────────────────────────────────────
-    if ("serviceWorker" in navigator) {
-      const swCode = `
-        const CACHE = "macroscan-v1";
-        const ASSETS = ["./"];
-        self.addEventListener("install", e => {
-          e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-          self.skipWaiting();
-        });
-        self.addEventListener("activate", e => {
-          e.waitUntil(caches.keys().then(keys =>
-            Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-          ));
-          self.clients.claim();
-        });
-        self.addEventListener("fetch", e => {
-          if (e.request.url.includes("api.anthropic.com")) return;
-          e.respondWith(
-            caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => cached))
-          );
-        });
-      `;
-      const swBlob = new Blob([swCode], { type: "application/javascript" });
-      const swUrl = URL.createObjectURL(swBlob);
-      navigator.serviceWorker.register(swUrl).catch(() => {});
-    }
-  </script>
-
   <script type="text/babel">
     const { useState, useRef, useEffect, useCallback } = React;
 
-    // ── Constants ────────────────────────────────────────────────────────────
     const DAILY_GOALS = { calories: 2200, protein: 165, carbs: 220, fat: 73, fiber: 30 };
     const COLORS = { calories:"#FF6B35", protein:"#00E5A0", carbs:"#FFD93D", fat:"#A78BFA", fiber:"#60A5FA" };
     const ICONS  = { calories:"🔥", protein:"💪", carbs:"⚡", fat:"🫧", fiber:"🌿" };
-    const UNITS  = { calories:"kcal", protein:"g", carbs:"g", fat:"g", fiber:"g" };
 
-    // ── Storage helpers ──────────────────────────────────────────────────────
-    const lsGet = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } };
+    const lsGet = (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
     const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
-    // ── Sub-components ───────────────────────────────────────────────────────
-    function RadialProgress({ value, max, color, size=100, sw=8, children }) {
-      const r = (size - sw*2) / 2;
-      const circ = 2*Math.PI*r;
-      const off = circ * (1 - Math.min(value/max, 1));
+    // ── API Key Screen ───────────────────────────────────────────────────────
+    function ApiKeyScreen({ onSave }) {
+      const [val, setVal] = useState("");
+      const [err, setErr] = useState("");
+      const valid = val.startsWith("sk-ant-");
       return (
-        <svg width={size} height={size} style={{transform:"rotate(-90deg)", flexShrink:0}}>
+        <div style={{minHeight:"100vh",background:"#06060f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28}}>
+          <div style={{fontSize:56,marginBottom:16}}>🔥</div>
+          <div style={{fontSize:36,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#e8e8f0",marginBottom:4}}>MACRO<span style={{color:"#FF6B35"}}>SCAN</span></div>
+          <div style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:2,marginBottom:40,textAlign:"center"}}>AI-POWERED NUTRITION TRACKER</div>
+          <div style={{width:"100%",maxWidth:360}}>
+            <div style={{fontSize:10,color:"#555",fontFamily:"'Space Mono',monospace",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Anthropic API Key</div>
+            <input
+              type="password" value={val}
+              onChange={e=>{setVal(e.target.value);setErr("");}}
+              onPaste={e=>{setTimeout(()=>setErr(""),100);}}
+              placeholder="sk-ant-api03-..."
+              style={{width:"100%",background:"#0d0d1a",border:`1px solid ${err?"#ff4444":valid&&val?"#00E5A040":"#1e1e3a"}`,borderRadius:12,padding:"14px",color:"#e8e8f0",fontFamily:"'Space Mono',monospace",fontSize:12,outline:"none",marginBottom:10,transition:"border-color .2s"}}
+            />
+            {err && <div style={{fontSize:10,color:"#ff6666",fontFamily:"'Space Mono',monospace",marginBottom:10}}>⚠ {err}</div>}
+            <div style={{fontSize:10,color:"#2a2a3a",fontFamily:"'Space Mono',monospace",lineHeight:1.8,marginBottom:24}}>
+              Get your key at console.anthropic.com → API Keys<br/>
+              Saved only on this device. Never shared anywhere.
+            </div>
+            <button
+              onClick={()=>{
+                if(!valid){setErr("Key must start with sk-ant-"); return;}
+                onSave(val.trim());
+              }}
+              style={{width:"100%",background:valid?"linear-gradient(135deg,#FF6B35,#e5521d)":"#111",border:"none",color:valid?"#fff":"#333",borderRadius:12,padding:"15px",fontFamily:"'Space Mono',monospace",fontSize:12,fontWeight:700,cursor:valid?"pointer":"not-allowed",letterSpacing:1,transition:"all .2s"}}
+            >ENTER MACROSCAN →</button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Radial Progress ──────────────────────────────────────────────────────
+    function RadialProgress({ value, max, color, size=100, sw=8, children }) {
+      const r = (size-sw*2)/2, circ = 2*Math.PI*r;
+      const off = circ*(1-Math.min(value/max,1));
+      return (
+        <svg width={size} height={size} style={{transform:"rotate(-90deg)",flexShrink:0}}>
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1a1a2e" strokeWidth={sw}/>
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={sw}
             strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"
@@ -125,8 +93,9 @@
       );
     }
 
+    // ── Macro Bar ────────────────────────────────────────────────────────────
     function MacroBar({ k, value, goal }) {
-      const pct = Math.min((value/goal)*100, 100);
+      const pct = Math.min((value/goal)*100,100);
       return (
         <div style={{marginBottom:12}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
@@ -136,13 +105,13 @@
             </span>
           </div>
           <div style={{height:5,background:"#1a1a2e",borderRadius:3,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${pct}%`,background:COLORS[k],borderRadius:3,
-              transition:"width 1s cubic-bezier(.34,1.56,.64,1)",boxShadow:`0 0 8px ${COLORS[k]}88`}}/>
+            <div style={{height:"100%",width:`${pct}%`,background:COLORS[k],borderRadius:3,transition:"width 1s cubic-bezier(.34,1.56,.64,1)",boxShadow:`0 0 8px ${COLORS[k]}88`}}/>
           </div>
         </div>
       );
     }
 
+    // ── Meal Card ────────────────────────────────────────────────────────────
     function MealCard({ meal, idx, onDelete }) {
       const [open, setOpen] = useState(false);
       const t = new Date(meal.timestamp).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
@@ -171,50 +140,16 @@
                   </div>
                 ))}
               </div>
-              <button onClick={()=>onDelete(meal.id)} style={{
-                width:"100%",background:"transparent",border:"1px solid #2a1a1a",color:"#553333",
-                fontSize:10,fontFamily:"'Space Mono',monospace",padding:"7px",borderRadius:8,cursor:"pointer",letterSpacing:1
-              }}>REMOVE MEAL</button>
+              <button onClick={()=>onDelete(meal.id)} style={{width:"100%",background:"transparent",border:"1px solid #2a1a1a",color:"#553333",fontSize:10,fontFamily:"'Space Mono',monospace",padding:"7px",borderRadius:8,cursor:"pointer",letterSpacing:1}}>REMOVE MEAL</button>
             </div>
           )}
         </div>
       );
     }
 
-    // ── API Key Gate ─────────────────────────────────────────────────────────
-    function ApiKeyScreen({ onSave }) {
-      const [val, setVal] = useState("");
-      return (
-        <div style={{minHeight:"100vh",background:"#06060f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28}}>
-          <div style={{fontSize:48,marginBottom:16}}>🔥</div>
-          <div style={{fontSize:32,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:3,color:"#e8e8f0",marginBottom:6}}>MACRO<span style={{color:"#FF6B35"}}>SCAN</span></div>
-          <div style={{fontSize:11,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:2,marginBottom:36,textAlign:"center"}}>AI-POWERED NUTRITION TRACKER</div>
-          <div style={{width:"100%",maxWidth:340}}>
-            <div style={{fontSize:11,color:"#555",fontFamily:"'Space Mono',monospace",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Anthropic API Key</div>
-            <input
-              type="password" value={val} onChange={e=>setVal(e.target.value)}
-              placeholder="sk-ant-..."
-              style={{width:"100%",background:"#0d0d1a",border:"1px solid #1e1e3a",borderRadius:12,padding:"13px 14px",
-                color:"#e8e8f0",fontFamily:"'Space Mono',monospace",fontSize:12,outline:"none",marginBottom:10}}
-            />
-            <div style={{fontSize:10,color:"#333",fontFamily:"'Space Mono',monospace",lineHeight:1.7,marginBottom:20}}>
-              Get your key at console.anthropic.com → API Keys.<br/>
-              Stored locally on your device only. Never sent anywhere except Anthropic.
-            </div>
-            <button onClick={()=>val.startsWith("sk-")&&onSave(val)} style={{
-              width:"100%",background:val.startsWith("sk-")?"linear-gradient(135deg,#FF6B35,#e5521d)":"#111",
-              border:"none",color:val.startsWith("sk-")?"#fff":"#333",
-              borderRadius:12,padding:"14px",fontFamily:"'Space Mono',monospace",fontSize:12,
-              fontWeight:700,cursor:val.startsWith("sk-")?"pointer":"not-allowed",letterSpacing:1,transition:"all .2s"
-            }}>ENTER MACROSCAN →</button>
-          </div>
-        </div>
-      );
-    }
-
     // ── Main App ─────────────────────────────────────────────────────────────
     function App() {
-      const [apiKey, setApiKey] = useState("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");
+      const [apiKey, setApiKey]       = useState(()=>lsGet("ms_key",""));
       const [meals, setMeals]         = useState(()=>lsGet("ms_meals",[]));
       const [analyzing, setAnalyzing] = useState(false);
       const [captureMode, setCapture] = useState(false);
@@ -228,6 +163,7 @@
       const videoRef = useRef(); const canvasRef = useRef(); const fileRef = useRef();
       const today = new Date().toDateString();
 
+      const saveKey = k => { setApiKey(k); lsSet("ms_key", k); };
       const saveMeals = m => { setMeals(m); lsSet("ms_meals", m); };
 
       const todayMeals = meals.filter(m=>new Date(m.timestamp).toDateString()===today);
@@ -236,16 +172,15 @@
         {calories:0,protein:0,carbs:0,fat:0,fiber:0}
       );
 
-      const showToast = (msg,type="ok") => { setToast({msg,type}); setTimeout(()=>setToast(null),3000); };
+      const showToast = (msg,type="ok") => { setToast({msg,type}); setTimeout(()=>setToast(null),3200); };
 
       useEffect(()=>{ if(stream&&videoRef.current) videoRef.current.srcObject=stream; },[stream,captureMode]);
-
       const stopCam = useCallback(()=>{ if(stream) stream.getTracks().forEach(t=>t.stop()); setStream(null); setCapture(false); },[stream]);
 
       const startCam = async ()=>{
         setError(null);
         try {
-          const s = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:960}}});
+          const s = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
           setStream(s); setCapture(true); setPreview(null); setCaptured(null);
         } catch { setError("Camera access denied — use Upload instead."); }
       };
@@ -263,17 +198,23 @@
         const r=new FileReader();
         r.onload=ev=>{ setCaptured(ev.target.result); setPreview(ev.target.result); };
         r.readAsDataURL(f);
+        e.target.value="";
       };
 
       const analyze = async ()=>{
-        if(!captured) return;
+        if(!captured||!apiKey) return;
         setAnalyzing(true); setError(null);
         try {
           const b64=captured.split(",")[1];
           const mime=captured.startsWith("data:image/png")?"image/png":"image/jpeg";
           const res = await fetch("https://api.anthropic.com/v1/messages",{
             method:"POST",
-            headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+            headers:{
+              "Content-Type":"application/json",
+              "x-api-key":apiKey,
+              "anthropic-version":"2023-06-01",
+              "anthropic-dangerous-direct-browser-access":"true"
+            },
             body:JSON.stringify({
               model:"claude-sonnet-4-6",
               max_tokens:800,
@@ -281,46 +222,52 @@
                 {type:"image",source:{type:"base64",media_type:mime,data:b64}},
                 {type:"text",text:`Analyze this food photo and estimate nutritional macros. Respond ONLY with valid JSON, no markdown, no extra text:
 {"name":"short meal name max 40 chars","description":"1-2 sentence description","macros":{"calories":number,"protein":number,"carbs":number,"fat":number,"fiber":number}}
-All macro values are numbers in grams (calories in kcal). Be realistic. Sum all items if multiple foods visible.`}
+Calories in kcal, rest in grams. Be realistic. Sum all items if multiple foods visible.`}
               ]}]
             })
           });
           const data = await res.json();
-          if(data.error) throw new Error(data.error.message);
+          if(data.error) {
+            if(data.error.type==="authentication_error") {
+              saveKey("");
+              throw new Error("Invalid API key — you'll be asked to re-enter it.");
+            }
+            throw new Error(data.error.message||"API error");
+          }
           const txt=data.content?.find(b=>b.type==="text")?.text||"";
           const parsed=JSON.parse(txt.replace(/```json|```/g,"").trim());
           const meal={
             id:Date.now()+"",timestamp:Date.now(),imageUrl:captured,
             name:parsed.name||"Meal",description:parsed.description||"",
-            macros:{calories:+parsed.macros.calories||0,protein:+parsed.macros.protein||0,carbs:+parsed.macros.carbs||0,fat:+parsed.macros.fat||0,fiber:+parsed.macros.fiber||0}
+            macros:{
+              calories:+parsed.macros.calories||0,
+              protein:+parsed.macros.protein||0,
+              carbs:+parsed.macros.carbs||0,
+              fat:+parsed.macros.fat||0,
+              fiber:+parsed.macros.fiber||0
+            }
           };
           saveMeals([meal,...meals]);
           setCaptured(null); setPreview(null); setTab("today");
-          showToast(`Logged: ${meal.name}`);
+          showToast(`✓ Logged: ${meal.name}`);
         } catch(e) {
-          setError(e.message?.includes("auth")||e.message?.includes("API")
-            ? "Invalid API key — check your key in Settings."
-            : "Analysis failed. Try a clearer photo.");
+          setError(e.message||"Analysis failed. Try again.");
         } finally { setAnalyzing(false); }
       };
 
       const deleteMeal = id=>{ saveMeals(meals.filter(m=>m.id!==id)); showToast("Meal removed","err"); };
 
-      const logout = ()=>{ if(confirm("Remove API key from this device?")){ lsSet("ms_key",""); setApiKey(""); } };
-
-       
-
-      // Group history by day
       const historyDays = (() => {
         const byDay={};
         meals.forEach(m=>{ const d=new Date(m.timestamp).toDateString(); if(d!==today){ if(!byDay[d])byDay[d]=[]; byDay[d].push(m); } });
         return Object.entries(byDay).sort((a,b)=>new Date(b[0])-new Date(a[0]));
       })();
 
+      // Show key screen if no key saved
+      if(!apiKey) return <ApiKeyScreen onSave={saveKey}/>;
+
       return (
         <div style={{minHeight:"100vh",background:"#06060f",color:"#e8e8f0",fontFamily:"'DM Sans',sans-serif",maxWidth:430,margin:"0 auto",position:"relative",paddingTop:"env(safe-area-inset-top)",paddingBottom:"env(safe-area-inset-bottom)"}}>
-
-          {/* Ambient */}
           <div style={{position:"fixed",top:-80,left:-80,width:260,height:260,background:"radial-gradient(circle,#00E5A012,transparent 70%)",pointerEvents:"none",zIndex:0}}/>
           <div style={{position:"fixed",bottom:-40,right:-40,width:220,height:220,background:"radial-gradient(circle,#A78BFA0a,transparent 70%)",pointerEvents:"none",zIndex:0}}/>
 
@@ -345,7 +292,7 @@ All macro values are numbers in grams (calories in kcal). Be realistic. Sum all 
             </div>
           </div>
 
-          {/* Dashboard card */}
+          {/* Dashboard */}
           <div style={{padding:"0 16px 16px",position:"relative",zIndex:1}}>
             <div style={{background:"linear-gradient(135deg,#0d0d1a,#111128)",border:"1px solid #1e1e3a",borderRadius:20,padding:18}}>
               <div style={{display:"flex",alignItems:"center",gap:16}}>
@@ -365,19 +312,12 @@ All macro values are numbers in grams (calories in kcal). Be realistic. Sum all 
             </div>
           </div>
 
-          {/* Capture section */}
+          {/* Capture */}
           <div style={{padding:"0 16px 16px",position:"relative",zIndex:1}}>
             {!captureMode && !preview && (
               <div style={{display:"flex",gap:10}}>
-                {[
-                  {label:"📷 CAMERA",color:"#00E5A0",bg:"#00E5A0",action:startCam},
-                  {label:"📁 UPLOAD",color:"#FF6B35",bg:"#FF6B35",action:()=>fileRef.current?.click()},
-                ].map(btn=>(
-                  <button key={btn.label} onClick={btn.action} style={{
-                    flex:1,background:`${btn.bg}10`,border:`1px solid ${btn.bg}28`,color:btn.color,
-                    borderRadius:14,padding:"13px 0",fontSize:12,fontFamily:"'Space Mono',monospace",
-                    cursor:"pointer",letterSpacing:1,transition:"background .2s",
-                  }}>{btn.label}</button>
+                {[{label:"📷 CAMERA",c:"#00E5A0",a:startCam},{label:"📁 UPLOAD",c:"#FF6B35",a:()=>fileRef.current?.click()}].map(btn=>(
+                  <button key={btn.label} onClick={btn.a} style={{flex:1,background:`${btn.c}10`,border:`1px solid ${btn.c}28`,color:btn.c,borderRadius:14,padding:"13px 0",fontSize:12,fontFamily:"'Space Mono',monospace",cursor:"pointer",letterSpacing:1,transition:"background .2s"}}>{btn.label}</button>
                 ))}
                 <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
               </div>
@@ -388,10 +328,7 @@ All macro values are numbers in grams (calories in kcal). Be realistic. Sum all 
                 <div style={{position:"relative"}}>
                   <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:300,objectFit:"cover"}}/>
                   <canvas ref={canvasRef} style={{display:"none"}}/>
-                  <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
-                    <div style={{position:"absolute",inset:18,border:"1px solid #00E5A030",borderRadius:12}}/>
-                    <div style={{position:"absolute",left:18,right:18,height:1,background:"linear-gradient(90deg,transparent,#00E5A0,transparent)",top:"20%",animation:"sweep 2s linear infinite"}}/>
-                  </div>
+                  <div style={{position:"absolute",inset:18,border:"1px solid #00E5A030",borderRadius:12,pointerEvents:"none"}}/>
                 </div>
                 <div style={{display:"flex",gap:10,padding:12,background:"#06060f"}}>
                   <button onClick={stopCam} style={{background:"#100808",border:"1px solid #2a1515",color:"#555",borderRadius:12,padding:"11px 14px",fontFamily:"'Space Mono',monospace",fontSize:11,cursor:"pointer"}}>✕</button>
@@ -408,71 +345,65 @@ All macro values are numbers in grams (calories in kcal). Be realistic. Sum all 
                     <div style={{position:"absolute",inset:0,background:"#06060fcc",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14}}>
                       <div style={{fontSize:10,color:"#00E5A0",fontFamily:"'Space Mono',monospace",letterSpacing:3,animation:"pulse 1s ease infinite"}}>ANALYZING...</div>
                       <div style={{width:140,height:2,background:"#1a1a2e",borderRadius:2,overflow:"hidden",position:"relative"}}>
-                        <div style={{position:"absolute",top:0,bottom:0,width:"50%",background:"#00E5A0",borderRadius:2,animation:"sweep 1.2s ease infinite"}}/>
+                        <div style={{position:"absolute",top:0,bottom:0,width:"50%",background:"#00E5A0",borderRadius:2,animation:"toastIn .8s ease infinite alternate"}}/>
                       </div>
                     </div>
                   )}
                 </div>
                 <div style={{display:"flex",gap:10,padding:12,background:"#06060f"}}>
-                  <button onClick={()=>{setPreview(null);setCaptured(null);}} disabled={analyzing} style={{background:"#100808",border:"1px solid #2a1515",color:"#555",borderRadius:12,padding:"11px 14px",fontFamily:"'Space Mono',monospace",fontSize:11,cursor:"pointer"}}>✕</button>
-                  <button onClick={analyze} disabled={analyzing} style={{
-                    flex:1,background:analyzing?"#111":"linear-gradient(135deg,#FF6B35,#e5521d)",
-                    border:"none",color:analyzing?"#333":"#fff",borderRadius:12,padding:"11px",
-                    fontFamily:"'Space Mono',monospace",fontSize:12,fontWeight:700,
-                    cursor:analyzing?"not-allowed":"pointer",letterSpacing:1
-                  }}>{analyzing?"SCANNING...":"🔍 ANALYZE MACROS"}</button>
+                  <button onClick={()=>{setPreview(null);setCaptured(null);setError(null);}} disabled={analyzing} style={{background:"#100808",border:"1px solid #2a1515",color:"#555",borderRadius:12,padding:"11px 14px",fontFamily:"'Space Mono',monospace",fontSize:11,cursor:"pointer"}}>✕</button>
+                  <button onClick={analyze} disabled={analyzing} style={{flex:1,background:analyzing?"#111":"linear-gradient(135deg,#FF6B35,#e5521d)",border:"none",color:analyzing?"#333":"#fff",borderRadius:12,padding:"11px",fontFamily:"'Space Mono',monospace",fontSize:12,fontWeight:700,cursor:analyzing?"not-allowed":"pointer",letterSpacing:1}}>
+                    {analyzing?"SCANNING...":"🔍 ANALYZE MACROS"}
+                  </button>
                 </div>
               </div>
             )}
 
-            {error && <div style={{marginTop:10,padding:"10px 14px",background:"#1a0505",border:"1px solid #3a0f0f",borderRadius:12,fontSize:11,color:"#ff6666",fontFamily:"'Space Mono',monospace"}}>⚠ {error}</div>}
+            {error && (
+              <div style={{marginTop:10,padding:"11px 14px",background:"#1a0505",border:"1px solid #3a0f0f",borderRadius:12,fontSize:11,color:"#ff6666",fontFamily:"'Space Mono',monospace",lineHeight:1.6}}>
+                ⚠ {error}
+              </div>
+            )}
           </div>
 
           {/* Tabs */}
           <div style={{padding:"0 16px 10px",position:"relative",zIndex:1}}>
             <div style={{display:"flex",background:"#0d0d1a",borderRadius:12,padding:4,gap:4}}>
               {[["today",`TODAY (${todayMeals.length})`],["history","HISTORY"],["settings","⚙"]].map(([t,label])=>(
-                <button key={t} onClick={()=>setTab(t)} style={{
-                  flex:t==="settings"?0:1,padding:"8px "+(t==="settings"?"14px":"0"),
-                  borderRadius:9,background:tab===t?"#1e1e3a":"transparent",border:"none",
-                  color:tab===t?"#e8e8f0":"#444",fontFamily:"'Space Mono',monospace",
-                  fontSize:10,cursor:"pointer",textTransform:"uppercase",letterSpacing:1,transition:"all .2s",
-                }}>{label}</button>
+                <button key={t} onClick={()=>setTab(t)} style={{flex:t==="settings"?0:1,padding:`8px ${t==="settings"?"16px":"0"}`,borderRadius:9,background:tab===t?"#1e1e3a":"transparent",border:"none",color:tab===t?"#e8e8f0":"#444",fontFamily:"'Space Mono',monospace",fontSize:10,cursor:"pointer",textTransform:"uppercase",letterSpacing:1,transition:"all .2s"}}>{label}</button>
               ))}
             </div>
           </div>
 
           {/* Content */}
           <div style={{padding:"0 16px 80px",position:"relative",zIndex:1}}>
-            {tab==="today" && (
-              todayMeals.length===0
-                ? <div style={{textAlign:"center",padding:"48px 20px",color:"#2a2a3a"}}>
-                    <div style={{fontSize:40,marginBottom:10}}>🍽</div>
-                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:2,textTransform:"uppercase"}}>No meals logged yet</div>
-                    <div style={{fontSize:11,color:"#1e1e2a",marginTop:6}}>Snap a photo to get started</div>
-                  </div>
-                : todayMeals.map((m,i)=><MealCard key={m.id} meal={m} idx={i} onDelete={deleteMeal}/>)
+            {tab==="today" && (todayMeals.length===0
+              ? <div style={{textAlign:"center",padding:"48px 20px",color:"#2a2a3a"}}>
+                  <div style={{fontSize:40,marginBottom:10}}>🍽</div>
+                  <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:2,textTransform:"uppercase"}}>No meals logged yet</div>
+                  <div style={{fontSize:11,color:"#1e1e2a",marginTop:6}}>Snap a photo to get started</div>
+                </div>
+              : todayMeals.map((m,i)=><MealCard key={m.id} meal={m} idx={i} onDelete={deleteMeal}/>)
             )}
 
-            {tab==="history" && (
-              historyDays.length===0
-                ? <div style={{textAlign:"center",padding:"48px 20px",color:"#2a2a3a"}}>
-                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:2,textTransform:"uppercase"}}>No history yet</div>
-                  </div>
-                : historyDays.map(([day,dayMeals])=>{
-                    const dayCals=dayMeals.reduce((a,m)=>a+m.macros.calories,0);
-                    return (
-                      <div key={day} style={{marginBottom:22}}>
-                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                          <span style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:1,textTransform:"uppercase"}}>
-                            {new Date(day).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
-                          </span>
-                          <span style={{fontSize:10,color:"#FF6B35",fontFamily:"'Space Mono',monospace"}}>{Math.round(dayCals)} kcal</span>
-                        </div>
-                        {dayMeals.map((m,i)=><MealCard key={m.id} meal={m} idx={i} onDelete={deleteMeal}/>)}
+            {tab==="history" && (historyDays.length===0
+              ? <div style={{textAlign:"center",padding:"48px 20px",color:"#2a2a3a"}}>
+                  <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:2,textTransform:"uppercase"}}>No history yet</div>
+                </div>
+              : historyDays.map(([day,dayMeals])=>{
+                  const dayCals=dayMeals.reduce((a,m)=>a+m.macros.calories,0);
+                  return (
+                    <div key={day} style={{marginBottom:22}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                        <span style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:1,textTransform:"uppercase"}}>
+                          {new Date(day).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
+                        </span>
+                        <span style={{fontSize:10,color:"#FF6B35",fontFamily:"'Space Mono',monospace"}}>{Math.round(dayCals)} kcal</span>
                       </div>
-                    );
-                  })
+                      {dayMeals.map((m,i)=><MealCard key={m.id} meal={m} idx={i} onDelete={deleteMeal}/>)}
+                    </div>
+                  );
+                })
             )}
 
             {tab==="settings" && (
@@ -480,38 +411,29 @@ All macro values are numbers in grams (calories in kcal). Be realistic. Sum all 
                 <div style={{background:"linear-gradient(135deg,#0d0d1a,#111128)",border:"1px solid #1e1e3a",borderRadius:16,padding:18,marginBottom:12}}>
                   <div style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Daily Goals</div>
                   {Object.entries(DAILY_GOALS).map(([k,v])=>(
-                    <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                      <span style={{fontSize:12,color:"#888",fontFamily:"'DM Sans',sans-serif",textTransform:"capitalize"}}>{ICONS[k]} {k}</span>
-                      <span style={{fontSize:12,color:COLORS[k],fontFamily:"'Space Mono',monospace"}}>{v} {k==="calories"?"kcal":"g"}</span>
+                    <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <span style={{fontSize:12,color:"#777",fontFamily:"'DM Sans',sans-serif",textTransform:"capitalize"}}>{ICONS[k]} {k}</span>
+                      <span style={{fontSize:11,color:COLORS[k],fontFamily:"'Space Mono',monospace"}}>{v}{k==="calories"?" kcal":"g"}</span>
                     </div>
                   ))}
-                  <div style={{fontSize:10,color:"#2a2a3a",fontFamily:"'Space Mono',monospace",marginTop:8}}>Edit DAILY_GOALS in index.html to customize</div>
                 </div>
                 <div style={{background:"linear-gradient(135deg,#0d0d1a,#111128)",border:"1px solid #1e1e3a",borderRadius:16,padding:18,marginBottom:12}}>
-                  <div style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>API Key</div>
-                  <div style={{fontSize:12,color:"#555",fontFamily:"'Space Mono',monospace",marginBottom:14,wordBreak:"break-all"}}>{apiKey.slice(0,12)}••••••••••••</div>
-                  <button onClick={logout} style={{width:"100%",background:"transparent",border:"1px solid #2a1a1a",color:"#663333",fontSize:10,fontFamily:"'Space Mono',monospace",padding:"9px",borderRadius:8,cursor:"pointer",letterSpacing:1}}>REMOVE API KEY</button>
+                  <div style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:2,textTransform:"uppercase",marginBottom:12}}>API Key</div>
+                  <div style={{fontSize:11,color:"#444",fontFamily:"'Space Mono',monospace",marginBottom:14}}>{apiKey.slice(0,14)}••••••••••</div>
+                  <button onClick={()=>{if(confirm("Remove API key? You'll need to re-enter it.")){saveKey("");setTab("today");}}} style={{width:"100%",background:"transparent",border:"1px solid #2a1a1a",color:"#663333",fontSize:10,fontFamily:"'Space Mono',monospace",padding:"9px",borderRadius:8,cursor:"pointer",letterSpacing:1}}>REMOVE API KEY</button>
                 </div>
                 <div style={{background:"linear-gradient(135deg,#0d0d1a,#111128)",border:"1px solid #1e1e3a",borderRadius:16,padding:18}}>
-                  <div style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Data</div>
-                  <button onClick={()=>{ if(confirm("Clear ALL meal history? This cannot be undone.")){ saveMeals([]); showToast("History cleared","err"); }}} style={{width:"100%",background:"transparent",border:"1px solid #2a1a1a",color:"#663333",fontSize:10,fontFamily:"'Space Mono',monospace",padding:"9px",borderRadius:8,cursor:"pointer",letterSpacing:1}}>CLEAR ALL HISTORY</button>
+                  <div style={{fontSize:10,color:"#444",fontFamily:"'Space Mono',monospace",letterSpacing:2,textTransform:"uppercase",marginBottom:12}}>Data</div>
+                  <button onClick={()=>{if(confirm("Clear ALL meal history? Cannot be undone.")){saveMeals([]);showToast("History cleared","err");}}} style={{width:"100%",background:"transparent",border:"1px solid #2a1a1a",color:"#663333",fontSize:10,fontFamily:"'Space Mono',monospace",padding:"9px",borderRadius:8,cursor:"pointer",letterSpacing:1}}>CLEAR ALL HISTORY</button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Toast */}
           {toast && (
-            <div style={{
-              position:"fixed",bottom:24,left:"50%",
-              background:toast.type==="err"?"#1a0505":"#0a1a12",
-              border:`1px solid ${toast.type==="err"?"#3a0f0f":"#0f3a1f"}`,
-              color:toast.type==="err"?"#ff6666":"#00E5A0",
-              padding:"9px 20px",borderRadius:50,fontFamily:"'Space Mono',monospace",
-              fontSize:10,letterSpacing:1,whiteSpace:"nowrap",
-              animation:"toastIn .3s ease both",zIndex:200,
-              boxShadow:"0 4px 30px #00000099",
-            }}>{toast.msg}</div>
+            <div style={{position:"fixed",bottom:28,left:"50%",background:toast.type==="err"?"#1a0505":"#0a1a12",border:`1px solid ${toast.type==="err"?"#3a0f0f":"#0f3a1f"}`,color:toast.type==="err"?"#ff6666":"#00E5A0",padding:"10px 22px",borderRadius:50,fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,whiteSpace:"nowrap",animation:"toastIn .3s ease both",zIndex:200,boxShadow:"0 4px 30px #00000099"}}>
+              {toast.msg}
+            </div>
           )}
         </div>
       );
