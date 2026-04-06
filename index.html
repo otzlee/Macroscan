@@ -214,7 +214,7 @@
 
     // ── Main App ─────────────────────────────────────────────────────────────
     function App() {
-      const [apiKey, setApiKey] = useState("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");
+      const [apiKey, setApiKey] = useState("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");
       const [meals, setMeals]         = useState(()=>lsGet("ms_meals",[]));
       const [analyzing, setAnalyzing] = useState(false);
       const [captureMode, setCapture] = useState(false);
@@ -273,7 +273,7 @@
           const mime=captured.startsWith("data:image/png")?"image/png":"image/jpeg";
           const res = await fetch("https://api.anthropic.com/v1/messages",{
             method:"POST",
-            headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+            headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
             body:JSON.stringify({
               model:"claude-sonnet-4-6",
               max_tokens:800,
